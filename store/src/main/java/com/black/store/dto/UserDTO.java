@@ -8,9 +8,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 public class UserDTO {
     @Getter
+    @Setter
     public static class SaveRequest{
 
         @NotBlank(message = "닉네임을 입력해주세요.")
