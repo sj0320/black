@@ -2,11 +2,13 @@ package com.black.store.jwt;
 
 import com.black.store.config.auth.CustomUserDetails;
 import com.black.store.dto.UserDTO;
+import com.black.store.util.CookieUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,10 +27,6 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)throws AuthenticationException {
-//        String username = obtainUsername(request);
-//        String password = obtainPassword(request);
-//        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(username,password,null);
-//        return authenticationManager.authenticate(token);
         try {
             ObjectMapper objectMapper = new ObjectMapper(); // 내부에서 ObjectMapper 인스턴스 생성
 
@@ -49,17 +47,28 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authentication){
         CustomUserDetails userDetails = (CustomUserDetails)authentication.getPrincipal();
         String username = userDetails.getUsername();
+        String role = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)  // 권한 이름을 추출
+                .findFirst()  // 첫 번째 권한을 가져옴 (다중 권한 사용 시 변경 가능)
+                .orElse(null);  // 없을 경우 null 반환
 
-        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-        Iterator<? extends GrantedAuthority> iterator = authorities.iterator();
-        GrantedAuthority auth = iterator.next();
+        String access = jwtUtil.createJwt("access",username,role,600000L);
+        String refresh = jwtUtil.createJwt("refresh",username,role,86400000L);
 
-        String role = auth.getAuthority();
-        System.out.println(role);
-
-        String token = jwtUtil.createJwt(username,role,60*60*1000L);
-        response.addHeader("Authorization","Bearer " + token);
+        response.addHeader("access",access);
+        response.addCookie(CookieUtil.createCookie("refresh",refresh));
+        //response.addCookie(createCookie("refresh",refresh));
+        response.setStatus(HttpStatus.OK.value());
     }
+
+//    private Cookie createCookie(String key, String value) {
+//        Cookie cookie = new Cookie(key,value);
+//        cookie.setMaxAge(24*60*60);
+//        //cookie.setSecure(true);
+//        //cookie.setPath("/");
+//        cookie.setHttpOnly(true);
+//        return cookie;
+//    }
 
     @Override
     protected void unsuccessfulAuthentication(HttpServletRequest request,HttpServletResponse response,AuthenticationException failed){
